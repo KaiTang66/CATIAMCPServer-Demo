@@ -247,7 +247,6 @@ async def close_doc(doc_name:str,use_order:bool)->str:
             return "the document has been change, wait for the user's order"
 
 
-
 @mcp.tool()#2026.5.2
 #添加这个工具仅仅是个人习惯，再原点（0，0，0）使用坐标轴，其本身的功能远比这个tool强大和复杂
 async def add_axissystemstandard()->str:
@@ -757,8 +756,14 @@ async def add_groove(body_name:str,sketch_name:str,groove_name:str,rotationaxis_
                 newgroove.Name=groove_name
                 return f"create a groove:{groove_name}"
 
-@mcp.tool()#2026.5.31-2026.6.3
-async def add_hole(body_name:str,hole_name:str,selectet:bool,x:float,y:float,z:float,d:float,hole_type:int,hole_anchormode:int,hole_bottomtype:int,bottomlimit_mode:int,d1:float,a1:float,hole_threadingmode:int,hole_threadside:int,)->str:
+@mcp.tool()#2026.5.31-2026.6.3, 2026.6.20-2026.6.21
+async def add_hole(
+    body_name:str,hole_name:str,
+    selectet:bool,x:float,y:float,z:float,
+    hole_type:int,hole_anchormode:int,a2:float,d2:float,l2:float,countersunk_mode:int,
+    hole_bottomtype:int,bottomlimit_mode:int,d1:float,a1:float,l1:float,
+    hole_threadingmode:int,hole_threadside:int,d3:float,l3:float,p3:float
+    )->str:
     '''add a new hole
 
         Args:
@@ -769,15 +774,22 @@ async def add_hole(body_name:str,hole_name:str,selectet:bool,x:float,y:float,z:f
         y: Origin point y absolute coordinate
         z: Origin point z absolute coordinate
         Sets the origin point which the hole is anchored to. If mandatory, the entry point will be projected onto a tangent plane.
-        d: The hole depth.
         hole_type: the value of CatHoleType, that can be in tool(enum_CatHoleType) found.
-        hole_anchormode: the value of CatHoleAnchorMode, that can be in tool(enum_CatHoleAnchorMode) found
+        hole_anchormode: the value of CatHoleAnchorMode, that can be in tool(enum_CatHoleAnchorMode) found; it's pertinent when the hole type is: Counterbored or Counterdrilled
+        a2: the value of the head angle; it's valid when the hole type is: Tapered or Counterdrilled or Countersunk
+        d2: the value of the head diameter; it's valid when the hole type is: Counterbored or Counterdrilled
+        l2: the value of the head depth; it's valid when the hole type is: Counterbored or Counterdrilled or Countersunk
+        countersunk_mode: the value of CatCSHoleMode, that can be in tool(enum_CatCSHoleMode) found.
         hole_bottomtype: the value of CatHoleBottomType, that can be in tool(enum_CatHoleBottomType) found
         bottomlimit_mode: the value of CatLimitMode, that can be in tool(enum_CatLimitMode) found.
-        d1: the hole diameter
-        a1: the hole bottom angle
+        d1: the value of the hole diameter
+        a1: the value of the hole bottom angle
+        l1: The value of the hole depth.
         hole_threadingmode: the value of CatHoleThreadingMode, that can in tool(enum_CatHoleThreadingMode) found.
-        hole_threadside: the value of CatHoleThreadSide, that can in tool(enum_CatHoleThreadSide) found.
+        hole_threadside: the value of CatHoleThreadSide, that can in tool(enum_CatHoleThreadSide) found; it's valid when the hole is threaded.
+        d3: the value of the thread diameter; it's valid when the hole is threaded, and the thread diameter must bigger than the hole diameter.
+        l3: the value of the thread depthe; it's valid when the hole is threaded, and the thread depth is not bigger than the hole depth.
+        p3: the value of the thread pitch; it's valid when the hole is threaded.
     '''
     if selectet==True:
         global catia
@@ -806,43 +818,78 @@ async def add_hole(body_name:str,hole_name:str,selectet:bool,x:float,y:float,z:f
             return f"can't find the shape({boundary_parentname}) in body({body_name})"
 
         reference1=rootpart.CreateReferenceFromBRepName(brepname2,myshape)
-        myhole=rootpart.ShapeFactory.AddNewHoleFromPoint(x,y,z,reference1,d)
-        try:
+        myhole=rootpart.ShapeFactory.AddNewHoleFromPoint(x,y,z,reference1,l1)
+        
+        #Extension延伸
+        #BottomLimit.LimitMode目前只开发三种模式
+        if bottomlimit_mode==0:
+            myhole.BottomLimit.Dimension.Value=l1
+            if hole_bottomtype==2:
+                rootpart.HybridShapeFactory.DeleteObjectForDatum(myhole)
+                rootpart.Update()
+                return "The  trimmed hole bottom is not for blind bottomlimit"
+            else:
+                myhole.BottomType=hole_bottomtype
+                if hole_bottomtype==1:
+                    myhole.BottomAngle.Value=a1
+        elif bottomlimit_mode==1 or bottomlimit_mode==2:
+            if not hole_bottomtype==2:
+                rootpart.HybridShapeFactory.DeleteObjectForDatum(myhole)
+                rootpart.Update()
+                return "the bottomlimit limitmode is not right for the bottomtype"
+            else:
+                myhole.BottomType=hole_bottomtype
+        myhole.BottomLimit.LimitMode=bottomlimit_mode
+        myhole.Diameter.Value=d1
+
+        #Type类型
+        if hole_type==0:
             myhole.Type=hole_type
-        except:
-            return "hole type false"
-        try:
+        elif hole_type==1:
+            myhole.Type=hole_type
+            myhole.HeadAngle.Value=a2
             myhole.AnchorMode=hole_anchormode
-        except:
-            return "hole anchor mode false"    
-        try:
-            myhole.BottomType=hole_bottomtype
-        except:
-            return "hole bottom type false"
-        try:
-            myhole.BottomLimit.LimitMode=bottomlimit_mode
-        except:
-            return "hole bottom limit false"
-        try:
-            myhole.Diameter.Value=d1
-        except:
-            return "hole diameter false"
-        try:
-            myhole.BottomAngle.Value=a1
-        except:
-            return "hole bottomangle false"
-        try:    
+        elif hole_type==2:
+            myhole.Type=hole_type
+            myhole.HeadDiameter.Value=d2
+            myhole.HeadDepth.Value=l2
+            myhole.AnchorMode=hole_anchormode
+        elif hole_type==3:
+            myhole.Type=hole_type
+            if countersunk_mode==0:
+                myhole.HeadDepth.Value=l2
+                myhole.HeadAngle.Value=a2
+            elif countersunk_mode==1:
+                myhole.HeadDepth.Value=l2
+                myhole.HeadDiameter.Value=d2
+            elif countersunk_mode==2:
+                myhole.HeadAngle.Value=a2
+                myhole.HeadDiameter.Value=d2
+        elif hole_type==4:
+            myhole.Type=hole_type
+            myhole.CounterDrilledMode=0
+            #这里把CounterDrilledMode锁定为catCDModeNoCountersunkDiameter；是因为：Catia V5文档没有这个属性，且相关的值的变动Macros也展示不清晰
+            myhole.HeadDiameter.Value=d2
+            myhole.HeadDepth.Value=l2
+            myhole.HeadAngle.Value=a2
+            myhole.AnchorMode=hole_anchormode
+
+        #Thread Definition螺纹定义
+        if hole_threadingmode==1:
             myhole.ThreadingMode=hole_threadingmode
-        except:
-            return "hole threading mode false"
-        try:    
+        elif hole_threadingmode==0:
+            myhole.ThreadingMode=hole_threadingmode
             myhole.ThreadSide=hole_threadside
-        except:
-            return "hole thread side false"
+            if d3<=d1 or l3>l1:
+                rootpart.HybridShapeFactory.DeleteObjectForDatum(myhole)
+                rootpart.Update()
+                return "the thread diameter or depth is not right"
+            myhole.ThreadDiameter.Value=d3
+            myhole.ThreadDepth.Value=l3
+            myhole.ThreadPitch.Value=p3
         
         
-        
-        
+        #我觉得无需开发
         '''#修改hole位置暂不开发
         mysketch=myhole.Sketch
         rootpart.InWorkObject=mysketch
@@ -853,9 +900,6 @@ async def add_hole(body_name:str,hole_name:str,selectet:bool,x:float,y:float,z:f
         return "the hole is add"
     else:
         return "please in catia choose a plane for the new hole"
-        #此功能根据Macros而编写，只能做最简单的hole，可随后续开发而优化
-
-
 
 """为检验add_hole的selection
 @mcp.tool()#2026.6.2
@@ -877,18 +921,18 @@ async def check_selection()->str:
         return "please in catia choose a plane for the new hole"
 """
 
-@mcp.tool()#2026.4.30
-async def catiaquit()->str:
-    '''强制关闭
+@mcp.tool()#2026.4.30, 2026.6.19
+async def catiaquit(user_order:bool)->str:
+    '''close catia
 
     '''
     global catia
-    catia.quit()
-    return "已经强制关闭"
+    if user_order:
+        catia.quit()
+        return "Catia is closed"
+    else:
+        return "without user order"
 
-
-
-#mcpresource-unavailable
 @mcp.tool(title="ActiveDocument-Name")#2026.5.2
 async def getname_activedoc()->str:
     '''get the name of active Document
@@ -1290,8 +1334,6 @@ async def info_groove(partdoc_name:str,body_name:str,groove_name:str)->str:
             myrevaxis=mygroove.RevoluteAxis
             return f"groove sketch: {mysketch.Name}\nFirst angle: {myfirstangle}\nSecond angle: {mysecondangle}\nRevolute axis: {myrevaxis.Name}"
 
-
-
 @mcp.tool(title="enum_CatConstraintType")#2026.4.29,2026.5.2
 async def check_CatConstraintType()->dict:
     '''check the value of the CatConstraintType
@@ -1364,17 +1406,19 @@ async def check_CatHoleBottomType()->dict:
     }
     return CatHoleBottomType
 
-@mcp.tool(title="enum_CatLimitMode")#2026.6.1
+
+@mcp.tool(title="enum_CatLimitMode")#2026.6.1, 2026.6.20
 async def check_CatLimitMode()->dict:
     '''check the value of the CatLimitMode
     '''
+    #目前只开发三种
     CatLimitMode={
         "catOffsetLimit":0,
         "catUpToNextLimit":1,
         "catUpToLastLimit":2,
-        "catUptoPlaneLimit":3,
-        "catUpToSurfaceLimit":4,
-        "catUpThruNextLimit":5
+        #"catUptoPlaneLimit":3,
+        #"catUpToSurfaceLimit":4,
+        #"catUpThruNextLimit":5
     }
     
     return CatLimitMode
@@ -1399,7 +1443,34 @@ async def check_CatHoleThreadSide()->dict:
     }
     return CatHoleThreadSide
 
+@mcp.tool(title="enum_CatCSHoleMode")#2026.6.21
+async def check_CatCSHoleMode()->dict:
+    '''check the value of the CatCSHoleMode
+    '''
+    CatCSHoleMode={
+        "catCSModeDepthAngle":0,
+        "catCSModeDepthDiameter":1,
+        "catCSModeAngleDiameter":2
+    }
+    return CatCSHoleMode
 
+@mcp.tool(title="Captureviewer")#2026.6.20
+async def get_capture():
+    '''check the view of the catia viewer
+    '''
+    global catia
+    global CATIAMCP_FILE
+    if not CATIAMCP_FILE:
+        return "don't have file to save picture"
+    else:
+        viewer=catia.ActiveWindow.ActiveViewer
+        viewer.CaptureToFile(5,f"{CATIAMCP_FILE}\\MyImage.jpeg")
+
+    return Image(path=f"{CATIAMCP_FILE}\\MyImage.jpeg")
+
+
+
+#mcpresource-unavailable
 
 #mcpprompt-unavailable
 
