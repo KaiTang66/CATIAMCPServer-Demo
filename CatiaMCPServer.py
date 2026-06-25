@@ -5,10 +5,16 @@ from mcp.server.fastmcp import FastMCP, Image
 import sys
 import math
 import re
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 #Initialization MCPServer
 mcp = FastMCP("Catia") 
 
+#Constant
+CATIAMCP_FILE=os.getenv("catiamcp_file")
 
 #Global constant
 catia=None
