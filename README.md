@@ -1,2 +1,2 @@
 Bachelorarbeit  
-nächst Hochladen: 25.6.2026
+nächst Hochladen: 30.6.2026
