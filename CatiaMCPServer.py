@@ -644,8 +644,13 @@ async def add_shaft(body_name:str, sketch_name:str,shaft_name:str,rotationaxis_n
                     axis2d=mysketch.GeometricElements.Item("AbsoluteAxis")
                     axisref=axis2d.GetItem("HDirection")
                 else:
-                    axisref=mysketch.GeometricElements.Item(rotationaxis_name)
-
+                    rotationaxis=mysketch.GeometricElements.Item(rotationaxis_name)
+                    geo_type=rotationaxis.GeometricType
+                    if not geo_type==3:
+                        return "rotationaxis is not a line"
+                    boundary_index=re.search(r"\.(\d+)",rotationaxis_name).group(1)
+                    brepname=f"WireREdge:(Wire:(Brp:({mysketch.Name};{boundary_index});None:(Limits1:();Limits2:());Cf14:());WithTemporaryBody;WithoutBuildError;WithSelectingFeatureSupport;MFBRepVersion_CXR29"
+                    axisref=rootpart.CreateReferenceFromBRepName(brepname,mysketch)
                 newshaft.RevoluteAxis=axisref
             except:
                 return "can't set axis for shaft"
@@ -691,8 +696,13 @@ async def add_groove(body_name:str,sketch_name:str,groove_name:str,rotationaxis_
                     axis2d=mysketch.GeometricElements.Item("AbsoluteAxis")
                     axisref=axis2d.GetItem("HDirection")
                 else:
-                    axisref=mysketch.GeometricElements.Item(rotationaxis_name)
-                
+                    rotationaxis=mysketch.GeometricElements.Item(rotationaxis_name)
+                    geo_type=rotationaxis.GeometricType
+                    if not geo_type==3:
+                        return "rotationaxis is not a line"
+                    boundary_index=re.search(r"\.(\d+)",rotationaxis_name).group(1)
+                    brepname=f"WireREdge:(Wire:(Brp:({mysketch.Name};{boundary_index});None:(Limits1:();Limits2:());Cf14:());WithTemporaryBody;WithoutBuildError;WithSelectingFeatureSupport;MFBRepVersion_CXR29"
+                    axisref=rootpart.CreateReferenceFromBRepName(brepname,mysketch)
                 newgroove.RevoluteAxis=axisref
             except:
                 return "can't set axis for groove"
